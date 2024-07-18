@@ -37,6 +37,48 @@ resource "aws_route_table_association" "public_1" {
   route_table_id = aws_route_table.public.id
 }
 
+# Create a Security Group
+resource "aws_security_group" "my_security_group" {
+  vpc_id = aws_vpc.my_vpc.id
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+# Create an EC2 Instance
+resource "aws_instance" "my_instance" {
+  ami           = "ami-0b72821e2f351e396"  # Amazon Linux 2023
+  instance_type = "t2.micro"
+  subnet_id     = aws_subnet.public_subnet.id
+  security_groups = [aws_security_group.my_security_group.name]
+
+  tags = {
+    Name = "MyInstance"
+  }
+}
+
+output "instance_id" {
+  value = aws_instance.my_instance.id
+}
+
 data "archive_file" "zip_start_function" {
   type = "zip"
   source_file = "${path.module}/aws_lambda/start_func.py"
@@ -55,6 +97,12 @@ resource "aws_lambda_function" "start_instance_function" {
   function_name    = "start_instance_function"
   handler          = "start_func.lambda_handler"
   runtime          = "python3.12"
+
+  environtment = {
+    variables = {
+      INSTANCE_ID = aws_instance.my_instance.id
+    }
+  }
 }
 
 resource "aws_lambda_function" "stop_instance_function" {
@@ -63,4 +111,10 @@ resource "aws_lambda_function" "stop_instance_function" {
   function_name    = "stop_instance_function"
   handler          = "stop_func.lambda_handler"
   runtime          = "python3.12"
+
+  environment = {
+    variables = {
+      INSTANCE_ID = aws_instance.my_instance.id
+    }
+  }
 }
