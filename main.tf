@@ -118,3 +118,83 @@ resource "aws_lambda_function" "stop_instance_function" {
     }
   }
 }
+
+
+# IAM Role for Lambda Functions
+resource "aws_iam_role" "lambda_role" {
+  name = "lambda_ec2_control_role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        },
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+}
+
+# IAM Policy for Lambda to start/stop EC2 instances
+resource "aws_iam_role_policy" "lambda_policy" {
+  name   = "lambda_policy"
+  role   = aws_iam_role.lambda_role.id
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "ec2:StartInstances",
+          "ec2:StopInstances"
+        ],
+        Resource = "arn:aws:ec2:${var.region}:${data.aws_caller_identity.current.account_id}:instance/${aws_instance.my_instance.id}"
+      }
+    ]
+  })
+}
+
+
+
+# CloudWatch Event Rule 
+resource "aws_cloudwatch_event_rule" "start_instance_rule" {
+  name = "start_instance_rule"
+  schedule_expression = "cron(0 8 * * ? *)"
+}
+
+resource "aws_cloudwatch_event_target" "start_instance_target" {
+  rule = aws_cloudwatch_event_rule.start_instance_rule.name
+  target_id = "startLambda"
+  arn = aws_lambda_function.start_instance_function.arn
+}
+
+resource "aws_lambda_permission" "allow_start_instance" {
+  statement_id = "AllowExecutionFromCloudWatch"
+  action = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.start_instance_function.function_name
+  principal = "events.amazonaws.com"
+  source_arn = aws_cloudwatch_event_rule.start_instance_rule.arn
+}
+
+# CloudWatch Event Rule to trigger the stop instance Lambda function
+
+resource "aws_cloudwatch_event_rule" "stop_instance_rule" {
+  name = "stop_instance_rule"
+  schedule_expression = "cron (0 20 * * ? *)" # 8PM UTC Daily
+}
+
+resource "aws_cloudwatch_event_target" "stop_instance_target" {
+  rule      = aws_cloudwatch_event_rule.stop_instance_rule.name
+  target_id = "stopLambda"
+  arn       = aws_lambda_function.stop_instance_function.arn
+}
+
+resource "aws_lambda_permission" "allow_stop_instance" {
+  statement_id  = "AllowExecutionFromCloudWatch"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.stop_instance_function.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.stop_instance_rule.arn
+}
