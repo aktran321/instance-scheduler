@@ -6,7 +6,7 @@ provider "aws" {
 resource "aws_vpc" "instance_control" {
   cidr_block = "10.0.0.0/16"
   enable_dns_support = true
-  enable_dns_hostanmes = true
+  enable_dns_hostnames = true
 }
 
 # Public Subnet
@@ -98,7 +98,7 @@ resource "aws_lambda_function" "start_instance_function" {
   handler          = "start_func.lambda_handler"
   runtime          = "python3.12"
 
-  environtment = {
+  environment = {
     variables = {
       INSTANCE_ID = aws_instance.my_instance.id
     }
