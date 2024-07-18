@@ -36,3 +36,31 @@ resource "aws_route_table_association" "public_1" {
   subnet_id = aws_subnet.public_1.id
   route_table_id = aws_route_table.public.id
 }
+
+data "archive_file" "zip_start_function" {
+  type = "zip"
+  source_file = "${path.module}/aws_lambda/start_func.py"
+  output_path = "${path.module}/aws_lambda/start_func.zip"
+}
+
+data "archive_file" "zip_stop_function" {
+  type = "zip"
+  source_file = "${path.module}/aws_lambda/stop_func.py"
+  output_path = "${path.module}/aws_lambda/stop_func.zip"
+}
+
+resource "aws_lambda_function" "start_instance_function" {
+  filename         = data.archive_file.zip_start_function.output_path
+  source_code_hash = data.archive_file.zip_start_function.output_base64sha256
+  function_name    = "start_instance_function"
+  handler          = "start_func.lambda_handler"
+  runtime          = "python3.12"
+}
+
+resource "aws_lambda_function" "stop_instance_function" {
+  filename         = data.archive_file.zip_stop_function.output_path
+  source_code_hash = data.archive_file.zip_stop_function.output_base64sha256
+  function_name    = "stop_instance_function"
+  handler          = "stop_func.lambda_handler"
+  runtime          = "python3.12"
+}
